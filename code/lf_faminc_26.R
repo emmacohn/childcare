@@ -17,7 +17,7 @@ cpi_data <- realtalk::c_cpi_u_annual
 cpi2025 <- cpi_data$c_cpi_u[cpi_data$year==2025]
 
 # #### IPUMS DATA PULL: ACS ####
-# Get & set your API key from https://uma.pop.umn.edu/usa/registration
+# Get & set your API key from https://account.ipums.org/api_keys 
 # ipumsr::set_ipums_api_key("YOUR_API_KEY", save = TRUE)
 
 ## 2025
