@@ -1,14 +1,3 @@
-#### OVERVIEW ####
-### 2026 childcare factsheets update
-## request: median family income for families with young children, by STATE
-## CPS: FTOTVAL, YNGCH
-## ACS: FTOTINC, YNGCH
-
-#lfpr benchmarked to here for female, 2023: https://data.census.gov/table?q=employment%20by%20sex&g=010XX00US
-#median fam income by state benchmarked(mostly) to here, 2023: https://data.census.gov/table?q=B19113:%20Median%20Family%20Income%20in%20the%20Past%2012%20Months%20(in%202023%20Inflation-Adjusted%20Dollars)&g=010XX00US$0400000 
-#overall lfpr benchmarked to here, 2023: https://data.census.gov/table?q=Employment%20and%20Labor%20Force%20Status&g=010XX00US 
-
-
 #packages
 library(dplyr)
 library(ipumsr)
