@@ -2,7 +2,6 @@
 library(dplyr)
 library(ipumsr)
 library(tidyverse)
-library(here)
 library(janitor)
 library(realtalk)
 library(MetricsWeighted)
@@ -32,10 +31,10 @@ acs2024_extract <- define_extract_micro(
 
 # Download extract to input folder
 download_ext <- download_extract(extract = acs2024_extract,
-                                 download_dir = here('inputs/'), overwrite = TRUE)
+                                 download_dir = './inputs/', overwrite = TRUE)
 
 # Load downloaded ACS extract
-acs2024 <- read_ipums_micro(ddi = 'inputs/usa_00046.xml')
+acs2024 <- read_ipums_micro(ddi = 'inputs/usa_00001.xml')
 
 #### ACS DATA ANALYSIS ####
 
