@@ -8,6 +8,8 @@ library(MetricsWeighted)
 library(openxlsx)
 library(realtalk)
 library(readr)
+library(epidatatools)
+library(labelled)
 
 # pulling in chained CPI-U series
 cpi_data <- realtalk::c_cpi_u_annual
@@ -38,68 +40,106 @@ acs2024 <- read_ipums_micro(ddi = 'inputs/usa_00001.xml')
 
 #### ACS DATA ANALYSIS ####
 
-## 2024
-acs24_medfaminc <- acs2024 %>% 
-  #clean label names 
+acs_clean <- acs2024 |> 
   clean_names() %>%
+  mutate(south = case_when(
+          statefip %in% c(1,5,12,13,21,22,28,37,40,45,47,48,51,54) ~ 1,
+          TRUE ~ 0), 
+          statefip = to_factor(statefip))
+
+
+## 2024
+acs24_medfaminc <- acs_clean %>%  
   mutate(ftotinc = as.numeric(ftotinc)) %>% 
   #select(year, serial, pernum, famunit, ftotinc, perwt, hhwt) %>% 
   # remove duplicate household observations
   distinct(serial, famunit, .keep_all = TRUE) %>% 
   filter(yngch < 6, ftotinc > 0 & ftotinc < 9999998, hhtype %in% c(1:3)) %>% 
-  group_by(year, statefip) %>% 
   left_join(cpi_data, by='year') |> 
-  mutate(real_ftotinc = ftotinc * (cpi2025/c_cpi_u)) |> 
-  summarize(med24_faminc = weighted_median(ftotinc, w=perwt, na.rm=TRUE),
+  mutate(real_ftotinc = ftotinc * (cpi2025/c_cpi_u))
+
+
+state_inc <- acs24_medfaminc |> 
+  summarize(med24_faminc = averaged_median(ftotinc, w=perwt, na.rm=TRUE),
             avg24_faminc = weighted.mean(ftotinc, w=perwt, na.rm=TRUE),
-            med25_faminc = weighted_median(real_ftotinc, w=perwt, na.rm=TRUE),
-            avg25_famin = weighted.mean(real_ftotinc, w=perwt,na.rm=TRUE),
+            med25_faminc = averaged_median(real_ftotinc, w=perwt, na.rm=TRUE),
+            avg25_faminc = weighted.mean(real_ftotinc, w=perwt,na.rm=TRUE),
             n = n(),
-            wgt_n = sum(perwt))
+            wgt_n = sum(perwt),
+            .by = c(year, statefip))
 
+south_inc <- acs24_medfaminc |> 
+  summarize(med24_faminc = averaged_median(ftotinc, w=perwt, na.rm=TRUE),
+            avg24_faminc = weighted.mean(ftotinc, w=perwt, na.rm=TRUE),
+            med25_faminc = averaged_median(real_ftotinc, w=perwt, na.rm=TRUE),
+            avg25_faminc = weighted.mean(real_ftotinc, w=perwt,na.rm=TRUE),
+            n = n(),
+            wgt_n = sum(perwt),
+            .by = c(year, south))
 
-acs24_overall_lf <- acs2024 %>% 
+overall_lf_state <- acs_clean %>% 
   #clean label names 
   clean_names() %>%
   filter(labforce == 2) %>% 
-  group_by(year, statefip) %>% 
   summarize(lf_count = n(),
-            wgt_lfcount = sum(perwt))
+            wgt_lfcount = sum(perwt),
+            .by = c(year, statefip))
 
-acs24_mothers_lf <- acs2024 %>% 
+mothers_lf_state <- acs_clean %>% 
   #clean label names 
   clean_names() %>%
   filter(labforce == 2, yngch < 6, sex == 2) %>% 
-  group_by(year, statefip) %>% 
   summarize(lf_count = n(),
-            wgt_lfcount = sum(perwt))
+            wgt_lfcount = sum(perwt),
+            .by = c(year, statefip))
 
+overall_lf_south <- acs_clean %>% 
+  #clean label names 
+  clean_names() %>%
+  filter(labforce == 2) %>% 
+  summarize(lf_count = n(),
+            wgt_lfcount = sum(perwt),
+            .by = c(year, south))
 
-# infant affordability
-state_xwalk <- read_csv("./inputs/state_crosswalk.csv") %>% 
-  mutate(state_geo = as.character(state_geo)) 
-  
+mothers_lf_south <- acs_clean %>% 
+  #clean label names 
+  clean_names() %>%
+  filter(labforce == 2, yngch < 6, sex == 2) %>% 
+  summarize(lf_count = n(),
+            wgt_lfcount = sum(perwt),
+            .by = c(year, south))
+
 
 infant_cost <- read_csv("./inputs/childcare_input2026.csv") %>% 
   mutate(infant_afford = center_infant / .07)
 
-acs24_affordshare <- acs2024 %>% 
-  clean_names() %>% 
-  distinct(serial, famunit, .keep_all = TRUE) %>% 
+acs24_affordshare <- acs_clean %>%  
+  distinct(serial, famunit, .keep_all = TRUE) %>%
   filter(famunit == 1) %>% 
-  rename(state_geo = statefip) %>% 
-  mutate(state_geo = as.character(state_geo)) %>% 
-  left_join(state_xwalk) %>% 
-  select(-state_geo, -state_name) %>% 
+  rename(state_name = statefip) %>% 
   filter(ftotinc > 0 & ftotinc < 9999998, hhtype %in% c(1:3)) %>%
-  left_join(infant_cost) %>% 
-  select(year, perwt, statefips, ftotinc, center_infant, infant_afford) %>% 
+  left_join(infant_cost, by = 'state_name') %>% 
+  select(year, perwt, state_name, ftotinc, center_infant, infant_afford) %>% 
   left_join(cpi_data, by='year') |> 
   mutate(real_ftotinc = ftotinc * (cpi2025/c_cpi_u),
          afford_ind = if_else(infant_afford <= real_ftotinc, 1, 0)) %>% 
-  group_by(statefips) %>% 
+  group_by(state_name) %>% 
   mutate(afford_share = weighted_mean(afford_ind, w=perwt, na.rm=TRUE)) %>% 
-  distinct(statefips, afford_share)
+  distinct(state_name, afford_share)
+
+south_affordshare <- acs_clean %>%  
+  distinct(serial, famunit, .keep_all = TRUE) %>%
+  filter(famunit == 1) %>% 
+  rename(state_name = statefip) %>% 
+  filter(ftotinc > 0 & ftotinc < 9999998, hhtype %in% c(1:3)) %>%
+  left_join(infant_cost, by = 'state_name') %>% 
+  select(year, perwt, state_name, ftotinc, center_infant, infant_afford, south) %>% 
+  left_join(cpi_data, by='year') |> 
+  mutate(real_ftotinc = ftotinc * (cpi2025/c_cpi_u),
+         afford_ind = if_else(infant_afford <= real_ftotinc, 1, 0)) %>% 
+  group_by(south) %>% 
+  mutate(afford_share = weighted_mean(afford_ind, w=perwt, na.rm=TRUE)) %>% 
+  distinct(south, afford_share)
 
 #### create workbook ####
 
