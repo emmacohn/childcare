@@ -5,7 +5,7 @@ library(tidyverse)
 library(janitor)
 library(realtalk)
 library(MetricsWeighted)
-library(openxlsx)
+library(openxlsx2)
 library(realtalk)
 library(readr)
 library(epidatatools)
@@ -23,17 +23,17 @@ cpi2025 <- cpi_data$c_cpi_u[cpi_data$year==2025]
 
 ## 2025
 #Define extract
-acs2024_extract <- define_extract_micro(
-  collection = 'usa',
-  description = 'ACS extract for childcare factsheets',
-  samples = c('us2024a'),
-  variables = c('YEAR', 'STATEFIP', 'FTOTINC', 'FAMUNIT', 'YNGCH', 'HHTYPE', 'LABFORCE', 'SEX')) %>%
-  submit_extract() %>%
-  wait_for_extract()
+#acs2024_extract <- define_extract_micro(
+#  collection = 'usa',
+#  description = 'ACS extract for childcare factsheets',
+#  samples = c('us2024a'),
+#  variables = c('YEAR', 'STATEFIP', 'FTOTINC', 'FAMUNIT', 'YNGCH', 'HHTYPE', 'LABFORCE', 'SEX')) %>%
+#  submit_extract() %>%
+#  wait_for_extract()
 
 # Download extract to input folder
-download_ext <- download_extract(extract = acs2024_extract,
-                                 download_dir = './inputs/', overwrite = TRUE)
+#download_ext <- download_extract(extract = acs2024_extract,
+ #                                download_dir = './inputs/', overwrite = TRUE)
 
 # Load downloaded ACS extract
 acs2024 <- read_ipums_micro(ddi = 'inputs/usa_00001.xml')
@@ -141,21 +141,36 @@ south_affordshare <- acs_clean %>%
   mutate(afford_share = weighted_mean(afford_ind, w=perwt, na.rm=TRUE)) %>% 
   distinct(south, afford_share)
 
+ccworkers_affordshare <- read.csv("./inputs/uprooting_childcare.csv") |> 
+  summarize(income = averaged_median(wage, w = employment))
+
 #### create workbook ####
 
-childcare_faminc_lf_data <- createWorkbook()
 
-addWorksheet(childcare_faminc_lf_data, sheetName = "med_faminc")
-addWorksheet(childcare_faminc_lf_data, sheetName = "lf_overall")
-addWorksheet(childcare_faminc_lf_data, sheetName = "lf_mothers")
-addWorksheet(childcare_faminc_lf_data, sheetName = "afford_share")
+# create WB object
+wb <- wb_workbook()
+
+wb$
+  # add new worksheet
+  add_worksheet(sheet = "uprooting_childcare_output")$
+  # add family income data to worksheet
+  add_data(x = "median fam inc young child")$
+  add_data(x = state_inc, start_row = 2)$
+  add_data(x = south_inc, start_row = 55)$
+  # add new worksheet for mothers labor force participation
+  add_worksheet(sheet = "mothers LFP")$
+  add_data(x = "mothers lf", start_row = 1)$
+  add_data(x = mothers_lf_state, start_row = 2)$
+  add_data(x = mothers_lf_south, start_row = 55)$
+    # add new worksheet for share that can afford infant care
+  add_worksheet(sheet = "infant care afford share")$
+  add_data(x = "afford share", start_row = 1)$
+  add_data(x = acs24_affordshare, start_row = 2)$
+  add_data(x = south_affordshare, start_row = 55)
 
 
-writeData(childcare_faminc_lf_data, acs24_medfaminc, sheet = "med_faminc", startCol = 1, startRow = 1, colNames = TRUE)
-writeData(childcare_faminc_lf_data, acs24_overall_lf, sheet = "lf_overall", startCol = 1, startRow = 1, colNames = TRUE)
-writeData(childcare_faminc_lf_data, acs24_mothers_lf, sheet = "lf_mothers", startCol = 1, startRow = 1, colNames = TRUE)
-writeData(childcare_faminc_lf_data, acs24_affordshare, sheet = "afford_share", startCol = 1, startRow = 1, colNames = TRUE)
-
-saveWorkbook(childcare_faminc_lf_data, here("output/ccfs_acs2024_v2.xlsx"), overwrite = TRUE)
+# save workbook to output folder
+wb$
+  save("./output/uprooting_childcare_output.xlsx", overwrite = TRUE)
 
 
