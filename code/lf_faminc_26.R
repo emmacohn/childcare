@@ -10,6 +10,8 @@ library(realtalk)
 library(readr)
 library(epidatatools)
 library(labelled)
+library(matrixStats)
+library(spatstat)
 
 # pulling in chained CPI-U series
 cpi_data <- realtalk::c_cpi_u_annual
@@ -142,7 +144,7 @@ south_affordshare <- acs_clean %>%
   distinct(south, afford_share)
 
 ccworkers_affordshare <- read.csv("./inputs/uprooting_childcare.csv") |> 
-  summarize(income = averaged_median(wage, w = employment))
+  summarize(income = weighted.median(wage, w = employment))
 
 #### create workbook ####
 
